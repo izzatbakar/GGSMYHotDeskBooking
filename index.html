@@ -1105,6 +1105,7 @@
       note.textContent = 'Opening Microsoft sign-in...';
       try{
         var provider = new firebase.auth.OAuthProvider('microsoft.com');
+        provider.setCustomParameters({ tenant: '28825646-ef41-4c9b-b69e-305d76fc24e5' });
         await fbAuth.signInWithPopup(provider);
         // onAuthStateChanged handles the rest
       }catch(err){
