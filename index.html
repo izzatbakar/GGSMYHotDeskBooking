@@ -4,6 +4,22 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hot Desk Booking</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+  var firebaseConfig = {
+    apiKey: "AIzaSyABo6dIlKtINoJIj8cLMaRWhmFhi9N08b4",
+    authDomain: "ggsmyhotdeskbooking.firebaseapp.com",
+    projectId: "ggsmyhotdeskbooking",
+    storageBucket: "ggsmyhotdeskbooking.firebasestorage.app",
+    messagingSenderId: "816005407874",
+    appId: "1:816005407874:web:53e41a3758337257a8c09b"
+  };
+  firebase.initializeApp(firebaseConfig);
+  var fbAuth = firebase.auth();
+  var fbDb = firebase.firestore();
+</script>
 <style>
   :root{
     --bg:#F5F5F7;
@@ -224,7 +240,7 @@
     </div>
     <div class="top-actions">
       <div class="profile-chip" id="profileChip"></div>
-      <button class="btn" id="adminToggleBtn">Admin</button>
+      <button class="btn" id="adminToggleBtn" style="display:none;">Admin</button>
     </div>
   </div>
 
@@ -282,12 +298,14 @@
     </div>
     <div class="login-divider"></div>
     <h3>Sign in to book a desk</h3>
-    <p class="sub">Enter your name to continue. Your bookings are tracked against it so you can view and cancel them later.</p>
-    <input type="text" id="nameInput" placeholder="Full name" autocomplete="off">
+    <p class="sub">Use your Glory work account. Your bookings stay tied to it, so you can see and manage them from any device.</p>
     <div class="row-actions">
-      <button class="btn primary" id="nameSaveBtn" style="width:100%;">Log in</button>
+      <button class="btn primary" id="msSignInBtn" style="width:100%;justify-content:center;display:flex;align-items:center;gap:10px;">
+        <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><rect width="7" height="7" fill="#F25022"/><rect x="9" width="7" height="7" fill="#7FBA00"/><rect y="9" width="7" height="7" fill="#00A4EF"/><rect x="9" y="9" width="7" height="7" fill="#FFB900"/></svg>
+        Sign in with Microsoft
+      </button>
     </div>
-    <p class="login-note">Single sign-on will replace this step once we agree on a login mechanism.</p>
+    <p class="login-note" id="loginStatusNote"></p>
   </div>
 </div>
 
@@ -384,12 +402,12 @@
   ];
   var ALL_DESK_IDS = [1,2,3,5,6,7,8,9,10,11,12,13];
   var DEVICE_LABEL = 'LCD & Dock';
-  var ADMIN_PASSCODE = 'admin123';
   var MAX_DATES = 7;
 
   var state = {
     profile: null,
     isAdmin: false,
+    canBeAdmin: false,
     dateMode: 'single',
     selectedDates: [],
     desksConfig: {},
@@ -426,43 +444,46 @@
   function openOverlay(id){ document.getElementById(id).classList.add('show'); }
   function closeOverlay(id){ document.getElementById(id).classList.remove('show'); }
 
-  async function storageGet(key, shared){
-    try{
-      var r = await window.storage.get(key, !!shared);
-      return r ? r.value : null;
-    }catch(e){ return null; }
+  async function loadDesksConfigFromFirestore(){
+    var cfg = {};
+    var snap = await fbDb.collection('deskAdjustments').get();
+    snap.forEach(function(doc){ cfg[doc.id] = doc.data(); });
+    return cfg;
   }
-  async function storageSet(key, value, shared){
-    try{ await window.storage.set(key, value, !!shared); return true; }
-    catch(e){ console.error('storage set failed', e); return false; }
+  async function saveDeskPeriods(deskId, periods){
+    await fbDb.collection('deskAdjustments').doc(String(deskId)).set({ periods: periods });
+  }
+
+  async function loadBookingsFromFirestore(){
+    var bookings = {};
+    var snap = await fbDb.collection('bookings').get();
+    snap.forEach(function(doc){ bookings[doc.id] = doc.data(); });
+    return bookings;
+  }
+  async function saveBookingDoc(key, data){
+    await fbDb.collection('bookings').doc(key).set(data);
+  }
+  async function deleteBookingDoc(key){
+    await fbDb.collection('bookings').doc(key).delete();
+  }
+
+  async function checkIsAdmin(email){
+    if(!email) return false;
+    try{
+      var doc = await fbDb.collection('admins').doc(email.toLowerCase()).get();
+      return doc.exists;
+    }catch(e){ return false; }
   }
 
   async function loadAll(){
-    var profileRaw = await storageGet('profile', false);
-    if(profileRaw){ try{ state.profile = JSON.parse(profileRaw); }catch(e){} }
-
-    var configRaw = await storageGet('desks-config', true);
-    if(configRaw){ try{ state.desksConfig = JSON.parse(configRaw); }catch(e){ state.desksConfig = {}; } }
+    var configObj = await loadDesksConfigFromFirestore();
     ALL_DESK_IDS.forEach(function(id){
-      var cfg = state.desksConfig[id];
-      if(!cfg){
-        state.desksConfig[id] = { periods: [] };
-      } else if(!cfg.periods){
-        var periods = [];
-        if(cfg.status === 'unavailable'){
-          periods.push({ id: generateId(), start: todayISO(), end: null, note: cfg.note || '' });
-        }
-        state.desksConfig[id] = { periods: periods };
-      }
+      var cfg = configObj[id];
+      state.desksConfig[id] = cfg && cfg.periods ? { periods: cfg.periods } : { periods: [] };
     });
 
-    var bookingsRaw = await storageGet('bookings', true);
-    if(bookingsRaw){ try{ state.bookings = JSON.parse(bookingsRaw); }catch(e){ state.bookings = {}; } }
+    state.bookings = await loadBookingsFromFirestore();
   }
-
-  async function saveDesksConfig(){ await storageSet('desks-config', JSON.stringify(state.desksConfig), true); }
-  async function saveBookings(){ await storageSet('bookings', JSON.stringify(state.bookings), true); }
-  async function saveProfile(){ await storageSet('profile', JSON.stringify(state.profile), false); }
 
   function initials(name){
     var parts = name.trim().split(/\s+/);
@@ -473,8 +494,9 @@
 
   function renderProfileChip(){
     var chip = document.getElementById('profileChip');
-    if(!state.profile){ chip.innerHTML = ''; return; }
+    if(!state.profile){ chip.innerHTML = ''; chip.title = ''; return; }
     chip.innerHTML = '<span class="avatar">'+initials(state.profile.name)+'</span><span>'+state.profile.name+'</span>';
+    chip.title = 'Click to sign out';
   }
 
   function applyTheme(){
@@ -815,15 +837,18 @@
     }
 
     var bookedAt = new Date().toISOString();
-    state.selectedDates.forEach(function(iso){
-      state.bookings[bookingKey(iso, deskId)] = {
+    for(var i=0;i<state.selectedDates.length;i++){
+      var iso = state.selectedDates[i];
+      var bookingData = {
         deskId: deskId,
         date: iso,
         name: state.profile.name,
+        email: state.profile.email,
         bookedAt: bookedAt
       };
-    });
-    await saveBookings();
+      state.bookings[bookingKey(iso, deskId)] = bookingData;
+      await saveBookingDoc(bookingKey(iso, deskId), bookingData);
+    }
     renderFloorplan();
     renderMyBookings();
     showBookingConfirmation(deskId, state.selectedDates.slice());
@@ -880,19 +905,20 @@
     dates.forEach(function(iso){ bodyLines.push('- ' + fmtLong(iso)); });
     bodyLines.push('', 'You can cancel anytime from the Hot Desk Booking app.');
     var body = bodyLines.join('\n');
-    var mailto = 'mailto:?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+    var toAddr = (state.profile && state.profile.email) ? state.profile.email : '';
+    var mailto = 'mailto:' + encodeURIComponent(toAddr) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
     window.location.href = mailto;
   }
 
   function renderMyBookings(){
     var container = document.getElementById('myBookings');
     if(!state.profile){
-      container.innerHTML = '<div class="empty-state">Enter your name to see your bookings.</div>';
+      container.innerHTML = '<div class="empty-state">Sign in to see your bookings.</div>';
       return;
     }
     var mine = Object.keys(state.bookings)
       .map(function(k){ return state.bookings[k]; })
-      .filter(function(b){ return b.name === state.profile.name; })
+      .filter(function(b){ return b.email === state.profile.email; })
       .sort(function(a,b){ return a.date.localeCompare(b.date); });
 
     if(mine.length === 0){
@@ -917,8 +943,9 @@
   }
 
   async function cancelBooking(date, deskId){
-    delete state.bookings[bookingKey(date, deskId)];
-    await saveBookings();
+    var key = bookingKey(date, deskId);
+    delete state.bookings[key];
+    await deleteBookingDoc(key);
     renderFloorplan();
     renderMyBookings();
     showToast('Booking cancelled.');
@@ -975,7 +1002,7 @@
     var cfg = state.desksConfig[deskId];
     if(!cfg || !cfg.periods) return;
     cfg.periods = cfg.periods.filter(function(p){ return p.id !== periodId; });
-    await saveDesksConfig();
+    await saveDeskPeriods(deskId, cfg.periods);
     renderFloorplan();
     renderAdminExistingPeriods(deskId);
     renderAdminList();
@@ -1004,7 +1031,7 @@
     if(!state.desksConfig[deskId]){ state.desksConfig[deskId] = { periods: [] }; }
     if(!state.desksConfig[deskId].periods){ state.desksConfig[deskId].periods = []; }
     state.desksConfig[deskId].periods.push({ id: generateId(), start: start, end: end, note: note });
-    await saveDesksConfig();
+    await saveDeskPeriods(deskId, state.desksConfig[deskId].periods);
     renderFloorplan();
     renderAdminExistingPeriods(deskId);
     renderAdminList();
@@ -1040,6 +1067,7 @@
   }
 
   function toggleAdmin(){
+    if(!state.canBeAdmin) return;
     if(state.isAdmin){
       state.isAdmin = false;
       document.getElementById('adminToggleBtn').classList.remove('admin-on');
@@ -1048,12 +1076,6 @@
       document.getElementById('adminPanel').classList.remove('show');
       document.getElementById('adminBackdrop').classList.remove('show');
       renderFloorplan();
-      return;
-    }
-    var code = prompt('Enter admin passcode');
-    if(code === null) return;
-    if(code !== ADMIN_PASSCODE){
-      showToast('Incorrect passcode.');
       return;
     }
     state.isAdmin = true;
@@ -1078,19 +1100,17 @@
     document.getElementById('calCloseBtn').addEventListener('click', function(){ closeOverlay('calendarOverlay'); });
     document.getElementById('calPrevBtn').addEventListener('click', function(){ shiftCalendarMonth(-1); });
     document.getElementById('calNextBtn').addEventListener('click', function(){ shiftCalendarMonth(1); });
-    document.getElementById('nameSaveBtn').addEventListener('click', async function(){
-      var val = document.getElementById('nameInput').value.trim();
-      if(!val){ showToast('Enter your name to continue.'); return; }
-      var isFirstLogin = !state.profile;
-      state.profile = { name: val };
-      await saveProfile();
-      renderProfileChip();
-      renderMyBookings();
-      closeOverlay('nameOverlay');
-      if(isFirstLogin){ revealApp(); }
-    });
-    document.getElementById('nameInput').addEventListener('keydown', function(e){
-      if(e.key === 'Enter'){ document.getElementById('nameSaveBtn').click(); }
+    document.getElementById('msSignInBtn').addEventListener('click', async function(){
+      var note = document.getElementById('loginStatusNote');
+      note.textContent = 'Opening Microsoft sign-in...';
+      try{
+        var provider = new firebase.auth.OAuthProvider('microsoft.com');
+        await fbAuth.signInWithPopup(provider);
+        // onAuthStateChanged handles the rest
+      }catch(err){
+        console.error(err);
+        note.textContent = 'Sign-in failed: ' + (err && err.message ? err.message : 'please try again.');
+      }
     });
     document.getElementById('confirmCloseBtn').addEventListener('click', function(){ closeOverlay('confirmOverlay'); });
     document.getElementById('errorCloseBtn').addEventListener('click', function(){ closeOverlay('errorOverlay'); });
@@ -1106,8 +1126,10 @@
       document.getElementById('adminBackdrop').classList.remove('show');
     });
     document.getElementById('profileChip').addEventListener('click', function(){
-      openOverlay('nameOverlay');
-      if(state.profile){ document.getElementById('nameInput').value = state.profile.name; }
+      if(!state.profile) return;
+      if(confirm('Sign out of Hot Desk Booking?')){
+        fbAuth.signOut();
+      }
     });
   }
 
@@ -1128,19 +1150,38 @@
   async function init(){
     await loadAll();
     applyTheme();
-    renderProfileChip();
     renderModeToggle();
     renderDateStrip();
     renderFloorplan();
-    renderMyBookings();
     wireStaticEvents();
-    var root = document.getElementById('appRoot');
-    if(!state.profile){
-      root.classList.add('pre-reveal');
-      openOverlay('nameOverlay');
-    } else {
-      fadeBgLayers(true);
-    }
+    document.getElementById('appRoot').classList.add('pre-reveal');
+
+    fbAuth.onAuthStateChanged(async function(user){
+      if(user){
+        state.profile = { name: user.displayName || user.email, email: (user.email || '').toLowerCase() };
+        state.canBeAdmin = await checkIsAdmin(state.profile.email);
+        state.isAdmin = false;
+        document.getElementById('adminToggleBtn').style.display = state.canBeAdmin ? '' : 'none';
+        document.getElementById('adminToggleBtn').classList.remove('admin-on');
+        document.getElementById('adminToggleBtn').textContent = 'Admin';
+        renderProfileChip();
+        renderMyBookings();
+        renderFloorplan();
+        document.getElementById('loginStatusNote').textContent = '';
+        closeOverlay('nameOverlay');
+        revealApp();
+      } else {
+        state.profile = null;
+        state.isAdmin = false;
+        state.canBeAdmin = false;
+        document.getElementById('adminToggleBtn').style.display = 'none';
+        renderProfileChip();
+        renderMyBookings();
+        document.getElementById('appRoot').classList.add('pre-reveal');
+        fadeBgLayers(false);
+        openOverlay('nameOverlay');
+      }
+    });
   }
 
   init();
