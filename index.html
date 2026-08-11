@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hot Desk Booking</title>
+<style>
+  :root{
+    --bg:#F5F5F7;
+    --page-bg:#F5F5F7;
+    --surface:#FFFFFF;
+    --text:#1D1D1F;
+    --text-secondary:#6E6E73;
+    --text-on-bg:#1D1D1F;
+    --text-on-bg-secondary:#6E6E73;
+    --border:#E3E3E6;
+    --accent:#0071E3;
+    --accent-dark:#0058B0;
+    --green:#31C25B;
+    --orange:#FFD6AD;
+    --orange-text:#7A3F00;
+    --red:#FF4438;
+    --grey:#E5E5EA;
+    --grey-text:#8A8A8E;
+    --radius-card:20px;
+    --radius:14px;
+    --shadow:0 1px 2px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06);
+    --topband:none;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Inter","Helvetica Neue",Arial,sans-serif;
+  }
+  body[data-theme="glory"]{
+    --bg:#F3F5F9;
+    --page-bg:#0B1050;
+    --surface:#FFFFFF;
+    --text:#111827;
+    --text-secondary:#5B6472;
+    --text-on-bg:#FFFFFF;
+    --text-on-bg-secondary:#AAB2E8;
+    --border:#DBDFE6;
+    --accent:#111986;
+    --accent-dark:#0A0F51;
+    --green:#1D9A57;
+    --orange:#FBD8A8;
+    --orange-text:#6B3E05;
+    --red:#C93F3F;
+    --grey:#E4E7EC;
+    --grey-text:#6B7280;
+    --radius-card:10px;
+    --radius:8px;
+    --shadow:0 1px 2px rgba(17,25,134,0.05), 0 6px 18px rgba(17,25,134,0.08);
+    --topband:none;
+    font-family:-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--page-bg);color:var(--text);-webkit-font-smoothing:antialiased;transition:background .4s ease;}
+  .topband{height:4px;background:var(--topband);position:relative;z-index:2;}
+
+  .bg-layer{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.8;transition:opacity 1s cubic-bezier(.16,1,.3,1);
+    background-image:
+      radial-gradient(circle at 12% 18%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 42%),
+      radial-gradient(circle at 88% 82%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 46%),
+      repeating-linear-gradient(0deg, color-mix(in srgb, var(--accent) 5%, transparent) 0px, color-mix(in srgb, var(--accent) 5%, transparent) 1px, transparent 1px, transparent 68px),
+      repeating-linear-gradient(90deg, color-mix(in srgb, var(--accent) 5%, transparent) 0px, color-mix(in srgb, var(--accent) 5%, transparent) 1px, transparent 1px, transparent 68px);
+    filter:saturate(0.7);
+  }
+  .bg-layer.faded{opacity:0.35;}
+  #mosaicCanvas{display:none;}
+  body[data-theme="glory"] #mosaicCanvas{display:block;}
+  body[data-theme="glory"] #gridBgLayer{display:none;}
+
+  .app{max-width:1080px;margin:0 auto;padding:32px 24px 80px;position:relative;z-index:1;
+    transition:opacity .9s cubic-bezier(.16,1,.3,1), transform .9s cubic-bezier(.16,1,.3,1), filter .9s ease, clip-path .9s cubic-bezier(.16,1,.3,1);
+    opacity:1;transform:scale(1);filter:blur(0);clip-path:circle(150% at 50% 0%);
+  }
+  .app.pre-reveal{opacity:0;transform:scale(0.97);filter:blur(14px);clip-path:circle(0% at 50% 5%);}
+
+  .login-logo{display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:18px;}
+  .login-mark{width:110px;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.12);margin-bottom:10px;}
+  .login-mark img{width:100%;display:block;}
+  .login-sub{font-size:11.5px;color:var(--text-secondary);letter-spacing:.06em;text-transform:uppercase;margin-top:2px;}
+  .login-divider{width:100%;height:1px;background:var(--border);margin:18px 0 16px;}
+  .login-note{font-size:11.5px;color:var(--text-secondary);text-align:center;margin-top:10px;}
+
+  .eyebrow{font-size:11px;font-weight:600;letter-spacing:.08em;color:var(--text-on-bg-secondary);text-transform:uppercase;margin:0 0 6px;display:none;}
+  body[data-theme="glory"] .eyebrow{display:block;}
+
+  .topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:28px;}
+  .brand h1{font-size:28px;font-weight:600;letter-spacing:-0.01em;margin:0 0 4px;color:var(--text-on-bg);}
+  .brand p{font-size:14px;color:var(--text-on-bg-secondary);margin:0;}
+  .top-actions{display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end;}
+  .profile-chip{font-size:13px;color:var(--text-secondary);background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:6px 12px 6px 6px;display:flex;align-items:center;gap:8px;cursor:pointer;}
+  .avatar{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;}
+  .btn{border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;font-weight:500;padding:8px 14px;border-radius:999px;cursor:pointer;transition:all .15s ease;font-family:inherit;}
+  .btn:hover{border-color:#c9c9cc;background:#fafafa;}
+  .btn:active{transform:scale(0.97);}
+  .btn.primary{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .btn.primary:hover{background:var(--accent-dark);border-color:var(--accent-dark);}
+  .btn.danger{color:#B3261E;}
+  .btn.admin-on{background:#1D1D1F;color:#fff;border-color:#1D1D1F;}
+  body[data-theme="glory"] .btn.admin-on{background:var(--accent-dark);border-color:var(--accent-dark);}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+  .btn.small{padding:5px 10px;font-size:12px;}
+  .link-btn{background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer;font-family:inherit;padding:0;}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-card);box-shadow:var(--shadow);padding:24px;margin-bottom:24px;}
+  .card h2{font-size:17px;font-weight:600;margin:0 0 4px;}
+  .card .sub{font-size:13px;color:var(--text-secondary);margin:0 0 18px;}
+
+  .mode-toggle{display:inline-flex;background:var(--bg);border:1px solid var(--border);border-radius:999px;padding:3px;margin-bottom:14px;}
+  .mode-toggle button{border:none;background:none;font-size:12.5px;font-weight:500;padding:6px 14px;border-radius:999px;cursor:pointer;color:var(--text-secondary);font-family:inherit;}
+  .mode-toggle button.active{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,0.08);}
+
+  .date-strip{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:6px;}
+  .date-chip{flex-shrink:0;min-width:64px;border:1px solid var(--border);border-radius:var(--radius);padding:10px 6px;text-align:center;cursor:pointer;transition:all .15s ease;background:var(--bg);}
+  .date-chip .dow{font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.03em;}
+  .date-chip .num{font-size:17px;font-weight:600;margin-top:2px;}
+  .date-chip.today{border-color:#c9c9cc;}
+  .date-chip:hover{border-color:#c9c9cc;transform:translateY(-1px);}
+  .date-chip.selected{background:var(--accent);border-color:var(--accent);}
+  .date-chip.selected .dow, .date-chip.selected .num{color:#fff;}
+  .date-hint{font-size:12px;color:var(--text-secondary);display:flex;justify-content:space-between;align-items:center;margin-top:10px;}
+
+  .viewing-banner{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:500;color:var(--accent-dark);background:var(--bg);border:1px solid var(--border);border-radius:999px;padding:7px 14px;margin-bottom:18px;}
+  .viewing-banner .dot-live{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;}
+
+  .cal-modal{max-width:340px;}
+  .cal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+  .cal-head .cal-month{font-size:15px;font-weight:600;}
+  .cal-head button{border:1px solid var(--border);background:var(--surface);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:14px;color:var(--text);}
+  .cal-head button:hover{background:var(--bg);}
+  .cal-weekdays{display:grid;grid-template-columns:repeat(7,1fr);font-size:10.5px;color:var(--text-secondary);text-align:center;margin-bottom:6px;text-transform:uppercase;letter-spacing:.03em;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;}
+  .cal-day{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:13px;border-radius:8px;cursor:pointer;transition:all .12s ease;}
+  .cal-day:hover{background:var(--bg);}
+  .cal-day.blank{cursor:default;}
+  .cal-day.blank:hover{background:none;}
+  .cal-day.past{color:var(--grey-text);cursor:not-allowed;}
+  .cal-day.past:hover{background:none;}
+  .cal-day.today{border:1.5px solid var(--accent);font-weight:600;}
+  .cal-day.selected{background:var(--accent);color:#fff;font-weight:600;}
+
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--text-secondary);margin:18px 0 20px;}
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block;}
+
+  .zone{display:grid;grid-template-columns:repeat(6,1fr);grid-template-rows:repeat(2,minmax(72px,auto));gap:8px;margin-bottom:40px;padding-bottom:32px;border-bottom:1px solid var(--border);}
+  .zone:last-child{margin-bottom:0;padding-bottom:0;border-bottom:none;}
+  .cell.zone-cell{grid-row:1 / 3;grid-column:6;}
+  .cell{border-radius:var(--radius);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-size:12.5px;font-weight:500;padding:8px 6px;cursor:default;transition:transform .15s ease, background-color .15s ease, box-shadow .15s ease;position:relative;line-height:1.3;user-select:none;}
+  .cell.desk{cursor:pointer;background:var(--green);color:#fff;}
+  .cell.desk:hover{background:var(--orange);color:var(--orange-text);transform:translateY(-2px);box-shadow:0 6px 14px rgba(0,0,0,0.10);}
+  .cell.desk.unavailable{background:var(--red);color:#fff;cursor:not-allowed;}
+  .cell.desk.unavailable:hover{transform:none;box-shadow:none;}
+  .cell.desk.booked{background:var(--accent);color:#fff;cursor:not-allowed;}
+  .cell.desk.booked:hover{transform:none;box-shadow:none;}
+  .cell.desk.admin-mode{cursor:pointer;}
+  .cell.grey{background:var(--grey);color:var(--grey-text);cursor:default;}
+  .cell .device{font-size:10.5px;opacity:.85;margin-top:2px;font-weight:400;}
+
+  .tooltip{position:fixed;z-index:50;background:#1D1D1F;color:#fff;font-size:12.5px;padding:8px 12px;border-radius:10px;pointer-events:none;max-width:220px;line-height:1.4;box-shadow:0 8px 20px rgba(0,0,0,0.25);opacity:0;transition:opacity .12s ease;}
+  body[data-theme="glory"] .tooltip{background:var(--accent-dark);}
+  .tooltip.show{opacity:1;}
+  .tooltip b{font-weight:600;}
+
+  table.bookings{width:100%;border-collapse:collapse;font-size:13.5px;}
+  table.bookings th{text-align:left;color:var(--text-secondary);font-weight:500;font-size:12px;padding:0 10px 10px;border-bottom:1px solid var(--border);}
+  table.bookings td{padding:12px 10px;border-bottom:1px solid var(--border);}
+  table.bookings tr:last-child td{border-bottom:none;}
+  .empty-state{text-align:center;padding:36px 10px;color:var(--text-secondary);font-size:13.5px;}
+  .status-pill{font-size:11px;padding:3px 9px;border-radius:999px;font-weight:500;display:inline-block;}
+  .status-pill.upcoming{background:#E6F1FB;color:#0C447C;}
+  body[data-theme="glory"] .status-pill.upcoming{background:#E1E4F7;color:var(--accent);}
+  .status-pill.past{background:var(--grey);color:var(--grey-text);}
+
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;opacity:0;pointer-events:none;transition:opacity .18s ease;}
+  .overlay.show{opacity:1;pointer-events:auto;}
+  .overlay.login-overlay{background:color-mix(in srgb, var(--page-bg) 45%, transparent);backdrop-filter:blur(2px);z-index:10;}
+  .modal{background:var(--surface);border-radius:18px;padding:28px;max-width:420px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,0.3);transform:translateY(8px) scale(0.98);transition:transform .18s ease;}
+  .overlay.show .modal{transform:translateY(0) scale(1);}
+  .modal h3{margin:0 0 6px;font-size:18px;font-weight:600;}
+  .modal p.sub{margin:0 0 18px;font-size:13.5px;color:var(--text-secondary);}
+  .modal input, .modal select, .modal textarea{width:100%;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;font-family:inherit;margin-bottom:12px;background:var(--bg);color:var(--text);}
+  .modal input:focus, .modal select:focus, .modal textarea:focus{outline:none;border-color:var(--accent);background:var(--surface);}
+  .modal .row-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:6px;}
+  .booking-summary{background:var(--bg);border-radius:12px;padding:12px 14px;font-size:13px;margin-bottom:14px;max-height:140px;overflow-y:auto;}
+  .booking-summary div{padding:3px 0;display:flex;justify-content:space-between;}
+  .booking-summary div span:first-child{color:var(--text-secondary);}
+
+  .admin-panel{position:fixed;top:0;right:0;height:100%;width:340px;max-width:90vw;background:var(--surface);box-shadow:-8px 0 30px rgba(0,0,0,0.15);z-index:90;transform:translateX(100%);transition:transform .22s ease;padding:24px;overflow-y:auto;}
+  .admin-panel.show{transform:translateX(0);}
+  .admin-panel h3{margin:0 0 4px;font-size:17px;font-weight:600;}
+  .admin-panel .sub{font-size:13px;color:var(--text-secondary);margin:0 0 20px;}
+  .admin-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:13.5px;}
+  .admin-row .name{font-weight:500;}
+  .backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.3);z-index:80;opacity:0;pointer-events:none;transition:opacity .2s ease;}
+  .backdrop.show{opacity:1;pointer-events:auto;}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#1D1D1F;color:#fff;font-size:13.5px;padding:12px 20px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.25);z-index:200;opacity:0;transition:all .25s ease;pointer-events:none;}
+  body[data-theme="glory"] .toast{background:var(--accent-dark);}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .footnote{font-size:12px;color:var(--text-on-bg-secondary);text-align:center;margin-top:20px;line-height:1.6;}
+  .footnote a{color:var(--text-on-bg-secondary);}
+
+  @media (max-width:640px){
+    .zone{grid-template-columns:repeat(6,minmax(0,1fr));}
+    .cell{font-size:11px;padding:6px 3px;}
+    .cell .device{font-size:9px;}
+    .card{padding:16px;}
+  }
+</style>
+</head>
+<body>
+<div class="bg-layer" id="gridBgLayer"></div>
+<canvas class="bg-layer" id="mosaicCanvas"></canvas>
+<div class="topband"></div>
+<div class="app" id="appRoot">
+
+  <div class="topbar">
+    <div class="brand">
+      <p class="eyebrow">Glory Global Solutions</p>
+      <h1>Hot Desk Booking</h1>
+      <p>Reserve a hot desk for any day this week. Assigned seats stay off-limits.</p>
+    </div>
+    <div class="top-actions">
+      <div class="profile-chip" id="profileChip"></div>
+      <button class="btn" id="adminToggleBtn">Admin</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Choose your dates</h2>
+    <p class="sub">Book one date, or several days at once &mdash; up to 7 in a single booking.</p>
+    <div class="mode-toggle" id="modeToggle">
+      <button data-mode="single" id="modeSingleBtn">Single date</button>
+      <button data-mode="multiple" id="modeMultipleBtn">Multiple dates</button>
+    </div>
+    <div class="date-strip" id="dateStrip"></div>
+    <div class="date-hint">
+      <span id="dateCount">0 selected</span>
+      <span>
+        <button class="link-btn" id="openCalendarBtn" style="margin-right:14px;">Open calendar</button>
+        <button class="link-btn" id="clearDatesBtn">Clear dates</button>
+      </span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Floor plan</h2>
+    <p class="sub">Hover a hot desk for details. Click an available desk to book it for your selected dates.</p>
+    <div class="viewing-banner" id="viewingBanner"><span class="dot-live"></span></div>
+    <div class="legend">
+      <span><span class="dot" style="background:var(--green)"></span>Available</span>
+      <span><span class="dot" style="background:var(--accent)"></span>Booked</span>
+      <span><span class="dot" style="background:var(--red)"></span>Unavailable</span>
+      <span><span class="dot" style="background:var(--grey)"></span>Non-Hot Desk</span>
+    </div>
+    <div id="floorplan"></div>
+  </div>
+
+  <div class="card">
+    <h2>Your bookings</h2>
+    <p class="sub">Everything you currently have reserved.</p>
+    <div id="myBookings"></div>
+  </div>
+
+  <div class="footnote">
+    Prototype note: this app books desks and keeps everyone's reservations in sync, but it can't send real emails or Outlook/Exchange calendar invites on its own &mdash; use the buttons in the confirmation to download a calendar file or open a pre-filled email instead. For a production rollout with automatic email and calendar delivery, connect this to your Microsoft 365 or Google Workspace tenant (e.g. via Power Automate/Graph API), or consider Power Apps if you'd rather build entirely on Microsoft's stack.
+  </div>
+
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<div class="overlay login-overlay" id="nameOverlay">
+  <div class="modal">
+    <div class="login-logo">
+      <div class="login-mark">
+        <img src="data:image/png;base64,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" alt="Glory logo">
+      </div>
+      <div class="login-sub">Global Solutions</div>
+    </div>
+    <div class="login-divider"></div>
+    <h3>Sign in to book a desk</h3>
+    <p class="sub">Enter your name to continue. Your bookings are tracked against it so you can view and cancel them later.</p>
+    <input type="text" id="nameInput" placeholder="Full name" autocomplete="off">
+    <div class="row-actions">
+      <button class="btn primary" id="nameSaveBtn" style="width:100%;">Log in</button>
+    </div>
+    <p class="login-note">Single sign-on will replace this step once we agree on a login mechanism.</p>
+  </div>
+</div>
+
+<div class="overlay" id="confirmOverlay">
+  <div class="modal">
+    <h3 id="confirmTitle">Booking confirmed</h3>
+    <p class="sub" id="confirmSub"></p>
+    <div class="booking-summary" id="confirmSummary"></div>
+    <div class="row-actions" style="flex-wrap:wrap;">
+      <button class="btn" id="icsBtn">Download calendar invite</button>
+      <button class="btn" id="mailBtn">Open email confirmation</button>
+      <button class="btn primary" id="confirmCloseBtn">Done</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="calendarOverlay">
+  <div class="modal cal-modal">
+    <div class="cal-head">
+      <button id="calPrevBtn" aria-label="Previous month">&lsaquo;</button>
+      <span class="cal-month" id="calMonthLabel"></span>
+      <button id="calNextBtn" aria-label="Next month">&rsaquo;</button>
+    </div>
+    <div class="cal-weekdays">
+      <div>Su</div><div>Mo</div><div>Tu</div><div>We</div><div>Th</div><div>Fr</div><div>Sa</div>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <p class="login-note" id="calHint" style="margin-top:14px;"></p>
+    <div class="row-actions">
+      <button class="btn primary" id="calCloseBtn" style="width:100%;">Done</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="errorOverlay">
+  <div class="modal">
+    <h3>Can't book that</h3>
+    <p class="sub" id="errorMsg"></p>
+    <div class="row-actions">
+      <button class="btn primary" id="errorCloseBtn">Got it</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="adminEditOverlay">
+  <div class="modal">
+    <h3 id="adminEditTitle">Edit desk</h3>
+    <p class="sub">Add a new adjustment below, or remove an existing one. Adjustments block booking only for the dates they cover.</p>
+    <div id="adminExistingPeriods"></div>
+    <div class="login-divider" style="margin:16px 0 14px;"></div>
+    <select id="adminPeriodType">
+      <option value="date">Single date</option>
+      <option value="range">Date range</option>
+      <option value="indefinite">Indefinite, until reopened</option>
+    </select>
+    <input type="date" id="adminStartDate">
+    <input type="date" id="adminEndDate">
+    <textarea id="adminNoteInput" rows="2" placeholder="Reason, e.g. dock cable missing"></textarea>
+    <div class="row-actions">
+      <button class="btn" id="adminEditCancelBtn">Close</button>
+      <button class="btn primary" id="adminAddPeriodBtn">Add adjustment</button>
+    </div>
+  </div>
+</div>
+
+<div class="backdrop" id="adminBackdrop"></div>
+<div class="admin-panel" id="adminPanel">
+  <h3>Admin overview</h3>
+  <p class="sub">Click any hot desk on the floor plan to manage its adjustments or hover it to see who booked it. This panel shows every current adjustment and today's bookings by name.</p>
+  <div id="adminList"></div>
+  <div class="row-actions" style="margin-top:18px;">
+    <button class="btn" id="adminCloseBtn" style="width:100%;">Close</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+
+  var ZONES = [
+    { label:'Kara', rows:[
+      [{t:'desk',id:13},{t:'desk',id:12},{t:'grey'},{t:'grey'},{t:'grey'}],
+      [{t:'desk',id:11},{t:'desk',id:10},{t:'grey'},{t:'grey'},{t:'grey'}]
+    ]},
+    { label:'Rinnah', rows:[
+      [{t:'desk',id:9},{t:'desk',id:8},{t:'grey'},{t:'grey'},{t:'grey'}],
+      [{t:'grey'},{t:'grey'},{t:'grey'},{t:'grey'},{t:'grey'}]
+    ]},
+    { label:'Jared', rows:[
+      [{t:'desk',id:7},{t:'desk',id:6},{t:'desk',id:5},{t:'grey'},{t:'grey'}],
+      [{t:'desk',id:3},{t:'desk',id:2},{t:'desk',id:1},{t:'grey'},{t:'grey'}]
+    ]}
+  ];
+  var ALL_DESK_IDS = [1,2,3,5,6,7,8,9,10,11,12,13];
+  var DEVICE_LABEL = 'LCD & Dock';
+  var ADMIN_PASSCODE = 'admin123';
+  var MAX_DATES = 7;
+
+  var state = {
+    profile: null,
+    isAdmin: false,
+    dateMode: 'single',
+    selectedDates: [],
+    desksConfig: {},
+    bookings: {},
+    pendingAdminDeskId: null,
+    theme: 'glory',
+    calendarMonth: null
+  };
+
+  function pad(n){ return n < 10 ? '0'+n : ''+n; }
+  function toISO(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+  function fromISO(s){ var p = s.split('-'); return new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2])); }
+  function todayISO(){ return toISO(new Date()); }
+  function fmtLong(iso){
+    var d = fromISO(iso);
+    return d.toLocaleDateString(undefined,{weekday:'long', month:'long', day:'numeric'});
+  }
+  function bookingKey(date, deskId){ return date+'_'+deskId; }
+  function generateId(){ return 'p_' + Date.now() + '_' + Math.floor(Math.random()*10000); }
+  function describePeriod(p){
+    if(!p) return '';
+    if(p.end === null) return 'Unavailable indefinitely (until reopened)';
+    if(p.start === p.end) return 'Unavailable on ' + fmtLong(p.start);
+    return 'Unavailable ' + fmtLong(p.start) + ' \u2013 ' + fmtLong(p.end);
+  }
+
+  function showToast(msg){
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 2600);
+  }
+
+  function openOverlay(id){ document.getElementById(id).classList.add('show'); }
+  function closeOverlay(id){ document.getElementById(id).classList.remove('show'); }
+
+  async function storageGet(key, shared){
+    try{
+      var r = await window.storage.get(key, !!shared);
+      return r ? r.value : null;
+    }catch(e){ return null; }
+  }
+  async function storageSet(key, value, shared){
+    try{ await window.storage.set(key, value, !!shared); return true; }
+    catch(e){ console.error('storage set failed', e); return false; }
+  }
+
+  async function loadAll(){
+    var profileRaw = await storageGet('profile', false);
+    if(profileRaw){ try{ state.profile = JSON.parse(profileRaw); }catch(e){} }
+
+    var configRaw = await storageGet('desks-config', true);
+    if(configRaw){ try{ state.desksConfig = JSON.parse(configRaw); }catch(e){ state.desksConfig = {}; } }
+    ALL_DESK_IDS.forEach(function(id){
+      var cfg = state.desksConfig[id];
+      if(!cfg){
+        state.desksConfig[id] = { periods: [] };
+      } else if(!cfg.periods){
+        var periods = [];
+        if(cfg.status === 'unavailable'){
+          periods.push({ id: generateId(), start: todayISO(), end: null, note: cfg.note || '' });
+        }
+        state.desksConfig[id] = { periods: periods };
+      }
+    });
+
+    var bookingsRaw = await storageGet('bookings', true);
+    if(bookingsRaw){ try{ state.bookings = JSON.parse(bookingsRaw); }catch(e){ state.bookings = {}; } }
+  }
+
+  async function saveDesksConfig(){ await storageSet('desks-config', JSON.stringify(state.desksConfig), true); }
+  async function saveBookings(){ await storageSet('bookings', JSON.stringify(state.bookings), true); }
+  async function saveProfile(){ await storageSet('profile', JSON.stringify(state.profile), false); }
+
+  function initials(name){
+    var parts = name.trim().split(/\s+/);
+    var s = parts[0] ? parts[0][0] : '';
+    if(parts.length > 1){ s += parts[parts.length-1][0]; }
+    return s.toUpperCase();
+  }
+
+  function renderProfileChip(){
+    var chip = document.getElementById('profileChip');
+    if(!state.profile){ chip.innerHTML = ''; return; }
+    chip.innerHTML = '<span class="avatar">'+initials(state.profile.name)+'</span><span>'+state.profile.name+'</span>';
+  }
+
+  function applyTheme(){
+    document.body.setAttribute('data-theme', 'glory');
+    drawMosaic();
+  }
+
+  function drawMosaic(){
+    var canvas = document.getElementById('mosaicCanvas');
+    var dpr = window.devicePixelRatio || 1;
+    var w = window.innerWidth, h = window.innerHeight;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    var ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    var topColor = [19, 25, 145];
+    var bottomColor = [10, 15, 81];
+    var grad = ctx.createLinearGradient(0, 0, 0, h);
+    grad.addColorStop(0, 'rgb('+topColor.join(',')+')');
+    grad.addColorStop(1, 'rgb('+bottomColor.join(',')+')');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+
+    var cell = Math.max(26, Math.round(w / 42));
+    var cols = Math.ceil(w / cell) + 1;
+    var tileColors = ['rgba(255,255,255,0.05)','rgba(255,255,255,0.09)','rgba(255,255,255,0.14)','rgba(120,140,255,0.10)'];
+
+    for(var c = 0; c < cols; c++){
+      var startFrac = 0.5 + Math.random() * 0.32;
+      var startY = h * startFrac;
+      for(var y = startY; y < h + cell; y += cell){
+        if(Math.random() < 0.72){
+          ctx.fillStyle = tileColors[Math.floor(Math.random() * tileColors.length)];
+          ctx.fillRect(c * cell, Math.floor(y), cell - 1.5, cell - 1.5);
+        }
+      }
+    }
+  }
+
+  var mosaicResizeTimer = null;
+  window.addEventListener('resize', function(){
+    clearTimeout(mosaicResizeTimer);
+    mosaicResizeTimer = setTimeout(drawMosaic, 200);
+  });
+
+  function renderModeToggle(){
+    document.getElementById('modeSingleBtn').classList.toggle('active', state.dateMode === 'single');
+    document.getElementById('modeMultipleBtn').classList.toggle('active', state.dateMode === 'multiple');
+  }
+
+  function renderDateStrip(){
+    var strip = document.getElementById('dateStrip');
+    strip.innerHTML = '';
+    var today = new Date();
+    var dows = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    for(var i=0;i<14;i++){
+      var d = new Date(today.getFullYear(), today.getMonth(), today.getDate()+i);
+      var iso = toISO(d);
+      var chip = document.createElement('div');
+      chip.className = 'date-chip' + (i===0 ? ' today' : '') + (state.selectedDates.indexOf(iso) > -1 ? ' selected' : '');
+      chip.innerHTML = '<div class="dow">'+dows[d.getDay()]+'</div><div class="num">'+d.getDate()+'</div>';
+      chip.addEventListener('click', function(iso){
+        return function(){ toggleDate(iso); };
+      }(iso));
+      strip.appendChild(chip);
+    }
+    var label = state.dateMode === 'single'
+      ? (state.selectedDates.length ? '1 date selected' : 'No date selected')
+      : state.selectedDates.length + ' of ' + MAX_DATES + ' selected';
+    document.getElementById('dateCount').textContent = label;
+  }
+
+  function toggleDate(iso){
+    if(state.dateMode === 'single'){
+      if(state.selectedDates.length === 1 && state.selectedDates[0] === iso){
+        state.selectedDates = [];
+      } else {
+        state.selectedDates = [iso];
+      }
+    } else {
+      var idx = state.selectedDates.indexOf(iso);
+      if(idx > -1){
+        state.selectedDates.splice(idx, 1);
+      } else {
+        if(state.selectedDates.length >= MAX_DATES){
+          showToast('You can select up to ' + MAX_DATES + ' dates at a time.');
+          return;
+        }
+        state.selectedDates.push(iso);
+        state.selectedDates.sort();
+      }
+    }
+    renderDateStrip();
+    renderFloorplan();
+    if(document.getElementById('calendarOverlay').classList.contains('show')){ renderCalendarPopover(); }
+  }
+
+  function setDateMode(mode){
+    if(state.dateMode === mode) return;
+    state.dateMode = mode;
+    if(mode === 'single' && state.selectedDates.length > 1){
+      state.selectedDates = [state.selectedDates[0]];
+    }
+    renderModeToggle();
+    renderDateStrip();
+    renderFloorplan();
+    if(document.getElementById('calendarOverlay').classList.contains('show')){ renderCalendarPopover(); }
+  }
+
+  function monthKey(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1); }
+
+  function openCalendarPopover(){
+    var now = new Date();
+    state.calendarMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    renderCalendarPopover();
+    openOverlay('calendarOverlay');
+  }
+
+  function renderCalendarPopover(){
+    var monthDate = state.calendarMonth;
+    var y = monthDate.getFullYear(), m = monthDate.getMonth();
+    document.getElementById('calMonthLabel').textContent = monthDate.toLocaleDateString(undefined, { month:'long', year:'numeric' });
+
+    var grid = document.getElementById('calGrid');
+    grid.innerHTML = '';
+    var firstDow = new Date(y, m, 1).getDay();
+    var daysInMonth = new Date(y, m+1, 0).getDate();
+    var today = todayISO();
+
+    for(var b=0; b<firstDow; b++){
+      var blank = document.createElement('div');
+      blank.className = 'cal-day blank';
+      grid.appendChild(blank);
+    }
+    for(var day=1; day<=daysInMonth; day++){
+      var iso = toISO(new Date(y, m, day));
+      var cell = document.createElement('div');
+      var isPast = iso < today;
+      var isToday = iso === today;
+      var isSelected = state.selectedDates.indexOf(iso) > -1;
+      cell.className = 'cal-day' + (isPast ? ' past' : '') + (isToday ? ' today' : '') + (isSelected ? ' selected' : '');
+      cell.textContent = day;
+      if(!isPast){
+        cell.addEventListener('click', function(iso){
+          return function(){ toggleDate(iso); };
+        }(iso));
+      } else {
+        cell.addEventListener('click', function(){ showToast("You can't book a past date."); });
+      }
+      grid.appendChild(cell);
+    }
+    document.getElementById('calHint').textContent = state.dateMode === 'single'
+      ? 'Tap a day to view or book it. Picking a new day replaces your current selection.'
+      : 'Tap days to add or remove them, up to ' + MAX_DATES + ' at a time.';
+  }
+
+  function shiftCalendarMonth(delta){
+    state.calendarMonth = new Date(state.calendarMonth.getFullYear(), state.calendarMonth.getMonth() + delta, 1);
+    renderCalendarPopover();
+  }
+
+  function updateViewingBanner(){
+    var banner = document.getElementById('viewingBanner');
+    var dates = referenceDates();
+    var text;
+    if(state.selectedDates.length === 0){
+      text = 'Showing today, ' + fmtLong(todayISO());
+    } else if(dates.length === 1){
+      text = 'Showing ' + fmtLong(dates[0]);
+    } else {
+      text = 'Showing ' + dates.length + ' selected dates (' + fmtLong(dates[0]) + ' to ' + fmtLong(dates[dates.length-1]) + ')';
+    }
+    banner.innerHTML = '<span class="dot-live"></span>' + escapeHtml(text);
+  }
+
+  function findUnavailablePeriod(deskId, iso){
+    var cfg = state.desksConfig[deskId];
+    if(!cfg || !cfg.periods) return null;
+    for(var i=0;i<cfg.periods.length;i++){
+      var p = cfg.periods[i];
+      if(iso >= p.start && (p.end === null || iso <= p.end)) return p;
+    }
+    return null;
+  }
+
+  function deskStatusOn(deskId, iso){
+    if(findUnavailablePeriod(deskId, iso)) return 'unavailable';
+    if(state.bookings[bookingKey(iso, deskId)]) return 'booked';
+    return 'available';
+  }
+
+  function referenceDates(){
+    return state.selectedDates.length ? state.selectedDates : [todayISO()];
+  }
+
+  function overallDeskClassAcrossSelection(deskId){
+    var dates = referenceDates();
+    var anyUnavailable = false, anyBooked = false, allBooked = true;
+    dates.forEach(function(iso){
+      var s = deskStatusOn(deskId, iso);
+      if(s === 'unavailable') anyUnavailable = true;
+      if(s === 'booked') anyBooked = true; else allBooked = false;
+    });
+    if(anyUnavailable) return 'unavailable';
+    if(allBooked) return 'booked';
+    if(anyBooked) return 'partial';
+    return 'available';
+  }
+
+  function renderFloorplan(){
+    updateViewingBanner();
+    var container = document.getElementById('floorplan');
+    container.innerHTML = '';
+    ZONES.forEach(function(zone){
+      var zoneEl = document.createElement('div');
+      zoneEl.className = 'zone';
+      zone.rows.forEach(function(row){
+        row.forEach(function(cellData){
+          var cell = document.createElement('div');
+          if(cellData.t === 'desk'){
+            var cls = overallDeskClassAcrossSelection(cellData.id);
+            cell.className = 'cell desk' + (cls !== 'available' ? ' ' + (cls === 'partial' ? 'booked' : cls) : '') + (state.isAdmin ? ' admin-mode' : '');
+            cell.innerHTML = 'Hot Desk '+cellData.id+'<div class="device">'+DEVICE_LABEL+'</div>';
+            cell.addEventListener('mouseenter', function(e){ showTooltip(e, cellData, cls); });
+            cell.addEventListener('mousemove', moveTooltip);
+            cell.addEventListener('mouseleave', hideTooltip);
+            cell.addEventListener('click', function(deskId){
+              return function(){ onDeskClick(deskId); };
+            }(cellData.id));
+          } else {
+            cell.className = 'cell grey';
+            cell.textContent = 'Unavailable';
+            cell.addEventListener('mouseenter', function(e){ showTooltip(e, cellData, 'grey'); });
+            cell.addEventListener('mousemove', moveTooltip);
+            cell.addEventListener('mouseleave', hideTooltip);
+          }
+          zoneEl.appendChild(cell);
+        });
+      });
+      var labelCell = document.createElement('div');
+      labelCell.className = 'cell grey zone-cell';
+      labelCell.textContent = 'Unavailable';
+      labelCell.addEventListener('mouseenter', function(e){ showTooltip(e, {t:'grey'}, 'grey'); });
+      labelCell.addEventListener('mousemove', moveTooltip);
+      labelCell.addEventListener('mouseleave', hideTooltip);
+      zoneEl.appendChild(labelCell);
+      container.appendChild(zoneEl);
+    });
+  }
+
+  function periodForSelection(deskId){
+    var dates = referenceDates();
+    for(var i=0;i<dates.length;i++){
+      var p = findUnavailablePeriod(deskId, dates[i]);
+      if(p) return p;
+    }
+    return null;
+  }
+
+  function bookingsForSelection(deskId){
+    var dates = referenceDates();
+    var out = [];
+    dates.forEach(function(iso){
+      var b = state.bookings[bookingKey(iso, deskId)];
+      if(b) out.push(b);
+    });
+    return out;
+  }
+
+  function showTooltip(e, cellData, cls){
+    var tip = document.getElementById('tooltip');
+    var html = '';
+    if(cellData.t === 'desk'){
+      html = '<b>Hot Desk '+cellData.id+'</b><br>'+DEVICE_LABEL;
+      if(cls === 'unavailable'){
+        var period = periodForSelection(cellData.id);
+        html += '<br>' + (period ? escapeHtml(describePeriod(period)) : 'Unavailable') + (period && period.note ? ' &mdash; ' + escapeHtml(period.note) : '');
+      } else if(cls === 'booked' || cls === 'partial'){
+        html += '<br>Status: booked for ' + (cls === 'booked' ? 'your selected date(s)' : 'some of your selected dates');
+        if(state.isAdmin){
+          var bookedList = bookingsForSelection(cellData.id);
+          if(bookedList.length){
+            html += '<br><b>Booked by:</b> ' + bookedList.map(function(b){ return escapeHtml(b.name) + ' (' + fmtLong(b.date) + ')'; }).join(', ');
+          }
+        }
+      } else {
+        html += '<br>Status: available';
+      }
+    } else {
+      html = '<b>Non-Hot Desk</b><br>Unavailable for booking';
+    }
+    tip.innerHTML = html;
+    tip.classList.add('show');
+    moveTooltip(e);
+  }
+  function moveTooltip(e){
+    var tip = document.getElementById('tooltip');
+    var x = e.clientX + 16, y = e.clientY + 16;
+    if(x + 230 > window.innerWidth){ x = e.clientX - 230; }
+    tip.style.left = x + 'px';
+    tip.style.top = y + 'px';
+  }
+  function hideTooltip(){ document.getElementById('tooltip').classList.remove('show'); }
+  function escapeHtml(s){ var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  async function onDeskClick(deskId){
+    if(state.isAdmin){
+      openAdminEdit(deskId);
+      return;
+    }
+    if(!state.profile){
+      openOverlay('nameOverlay');
+      return;
+    }
+    if(state.selectedDates.length === 0){
+      showToast('Select at least one date first.');
+      return;
+    }
+    var blocked = [];
+    var blockNote = '';
+    state.selectedDates.forEach(function(iso){
+      var period = findUnavailablePeriod(deskId, iso);
+      if(period){ blocked.push(iso); blockNote = period.note || blockNote; }
+    });
+    if(blocked.length > 0){
+      showError('Hot Desk '+deskId+' is marked unavailable on ' + blocked.map(fmtLong).join(', ') + (blockNote ? ' \u2014 ' + blockNote : '.'));
+      return;
+    }
+
+    var conflicts = [];
+    state.selectedDates.forEach(function(iso){
+      if(state.bookings[bookingKey(iso, deskId)]) conflicts.push(iso);
+    });
+    if(conflicts.length > 0){
+      showError('Hot Desk '+deskId+' is already booked on ' + conflicts.map(fmtLong).join(', ') + '. Pick another desk or remove those dates.');
+      return;
+    }
+
+    var bookedAt = new Date().toISOString();
+    state.selectedDates.forEach(function(iso){
+      state.bookings[bookingKey(iso, deskId)] = {
+        deskId: deskId,
+        date: iso,
+        name: state.profile.name,
+        bookedAt: bookedAt
+      };
+    });
+    await saveBookings();
+    renderFloorplan();
+    renderMyBookings();
+    showBookingConfirmation(deskId, state.selectedDates.slice());
+  }
+
+  function showBookingConfirmation(deskId, dates){
+    document.getElementById('confirmTitle').textContent = 'Booking confirmed';
+    document.getElementById('confirmSub').textContent = 'Hot Desk ' + deskId + ' is reserved for you.';
+    var summary = document.getElementById('confirmSummary');
+    summary.innerHTML = dates.map(function(iso){
+      return '<div><span>'+fmtLong(iso)+'</span><span>Hot Desk '+deskId+'</span></div>';
+    }).join('');
+    document.getElementById('icsBtn').onclick = function(){ downloadIcs(deskId, dates); };
+    document.getElementById('mailBtn').onclick = function(){ openMailConfirmation(deskId, dates); };
+    openOverlay('confirmOverlay');
+  }
+
+  function showError(msg){
+    document.getElementById('errorMsg').textContent = msg;
+    openOverlay('errorOverlay');
+  }
+
+  function icsDateStamp(iso, hour){
+    return iso.replace(/-/g,'') + 'T' + pad(hour) + '0000';
+  }
+
+  function downloadIcs(deskId, dates){
+    var lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Hot Desk Booking//EN'];
+    dates.forEach(function(iso, idx){
+      lines.push('BEGIN:VEVENT');
+      lines.push('UID:hotdesk-'+deskId+'-'+iso+'-'+Date.now()+'-'+idx+'@internal');
+      lines.push('DTSTAMP:'+icsDateStamp(todayISO(),9));
+      lines.push('DTSTART:'+icsDateStamp(iso,9));
+      lines.push('DTEND:'+icsDateStamp(iso,18));
+      lines.push('SUMMARY:Hot Desk '+deskId+' booking');
+      lines.push('DESCRIPTION:Reserved Hot Desk '+deskId+' ('+DEVICE_LABEL+') for '+(state.profile ? state.profile.name : '')+'.');
+      lines.push('END:VEVENT');
+    });
+    lines.push('END:VCALENDAR');
+    var blob = new Blob([lines.join('\r\n')], { type:'text/calendar' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'hot-desk-'+deskId+'-booking.ics';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function openMailConfirmation(deskId, dates){
+    var subject = 'Hot Desk ' + deskId + ' booking confirmation';
+    var bodyLines = ['Hi ' + (state.profile ? state.profile.name : '') + ',', '', 'Your Hot Desk ' + deskId + ' (' + DEVICE_LABEL + ') booking is confirmed for:'];
+    dates.forEach(function(iso){ bodyLines.push('- ' + fmtLong(iso)); });
+    bodyLines.push('', 'You can cancel anytime from the Hot Desk Booking app.');
+    var body = bodyLines.join('\n');
+    var mailto = 'mailto:?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+    window.location.href = mailto;
+  }
+
+  function renderMyBookings(){
+    var container = document.getElementById('myBookings');
+    if(!state.profile){
+      container.innerHTML = '<div class="empty-state">Enter your name to see your bookings.</div>';
+      return;
+    }
+    var mine = Object.keys(state.bookings)
+      .map(function(k){ return state.bookings[k]; })
+      .filter(function(b){ return b.name === state.profile.name; })
+      .sort(function(a,b){ return a.date.localeCompare(b.date); });
+
+    if(mine.length === 0){
+      container.innerHTML = '<div class="empty-state">No bookings yet. Pick a date above and click an available hot desk.</div>';
+      return;
+    }
+
+    var today = todayISO();
+    var rows = mine.map(function(b){
+      var isPast = b.date < today;
+      return '<tr><td>'+fmtLong(b.date)+'</td><td>Hot Desk '+b.deskId+'</td><td><span class="status-pill '+(isPast?'past':'upcoming')+'">'+(isPast?'Past':'Upcoming')+'</span></td>' +
+        '<td>' + (isPast ? '' : '<button class="btn small danger" data-date="'+b.date+'" data-desk="'+b.deskId+'">Cancel</button>') + '</td></tr>';
+    }).join('');
+
+    container.innerHTML = '<table class="bookings"><thead><tr><th>Date</th><th>Desk</th><th>Status</th><th></th></tr></thead><tbody>'+rows+'</tbody></table>';
+
+    container.querySelectorAll('button[data-date]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        cancelBooking(btn.getAttribute('data-date'), parseInt(btn.getAttribute('data-desk'),10));
+      });
+    });
+  }
+
+  async function cancelBooking(date, deskId){
+    delete state.bookings[bookingKey(date, deskId)];
+    await saveBookings();
+    renderFloorplan();
+    renderMyBookings();
+    showToast('Booking cancelled.');
+  }
+
+  function openAdminEdit(deskId){
+    state.pendingAdminDeskId = deskId;
+    document.getElementById('adminEditTitle').textContent = 'Hot Desk ' + deskId;
+    document.getElementById('adminPeriodType').value = 'date';
+    document.getElementById('adminStartDate').value = todayISO();
+    document.getElementById('adminEndDate').value = todayISO();
+    document.getElementById('adminNoteInput').value = '';
+    updatePeriodTypeUI();
+    renderAdminExistingPeriods(deskId);
+    openOverlay('adminEditOverlay');
+  }
+
+  function updatePeriodTypeUI(){
+    var type = document.getElementById('adminPeriodType').value;
+    document.getElementById('adminStartDate').style.display = type === 'indefinite' ? 'none' : 'block';
+    document.getElementById('adminEndDate').style.display = type === 'range' ? 'block' : 'none';
+  }
+
+  function renderAdminExistingPeriods(deskId){
+    var container = document.getElementById('adminExistingPeriods');
+    var pieces = [];
+
+    var currentBookings = bookingsForSelection(deskId);
+    if(currentBookings.length){
+      pieces.push('<div class="admin-row" style="border-bottom:none;"><span class="name" style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em;">Currently booked by</span></div>');
+      currentBookings.forEach(function(b){
+        pieces.push('<div class="admin-row"><span class="name">'+escapeHtml(b.name)+'</span><span style="text-align:right;font-size:12px;color:var(--text-secondary);">'+fmtLong(b.date)+'</span></div>');
+      });
+    }
+
+    var cfg = state.desksConfig[deskId];
+    if(!cfg || !cfg.periods || cfg.periods.length === 0){
+      if(!currentBookings.length){
+        pieces.push('<div class="empty-state" style="padding:10px 0;">No adjustments &mdash; this desk is available.</div>');
+      }
+    } else {
+      cfg.periods.forEach(function(p){
+        pieces.push('<div class="admin-row"><span class="name" style="font-weight:400;">'+escapeHtml(describePeriod(p))+(p.note?' &mdash; '+escapeHtml(p.note):'')+'</span><button class="btn small danger" data-period-id="'+p.id+'">Make available</button></div>');
+      });
+    }
+
+    container.innerHTML = pieces.join('');
+    container.querySelectorAll('button[data-period-id]').forEach(function(btn){
+      btn.addEventListener('click', function(){ removePeriod(deskId, btn.getAttribute('data-period-id')); });
+    });
+  }
+
+  async function removePeriod(deskId, periodId){
+    var cfg = state.desksConfig[deskId];
+    if(!cfg || !cfg.periods) return;
+    cfg.periods = cfg.periods.filter(function(p){ return p.id !== periodId; });
+    await saveDesksConfig();
+    renderFloorplan();
+    renderAdminExistingPeriods(deskId);
+    renderAdminList();
+    showToast('Hot Desk ' + deskId + ' updated.');
+  }
+
+  async function addPeriod(){
+    var deskId = state.pendingAdminDeskId;
+    if(deskId == null) return;
+    var type = document.getElementById('adminPeriodType').value;
+    var note = document.getElementById('adminNoteInput').value.trim();
+    var start, end;
+    if(type === 'date'){
+      start = document.getElementById('adminStartDate').value;
+      if(!start){ showToast('Pick a date.'); return; }
+      end = start;
+    } else if(type === 'range'){
+      start = document.getElementById('adminStartDate').value;
+      end = document.getElementById('adminEndDate').value;
+      if(!start || !end){ showToast('Pick a start and end date.'); return; }
+      if(end < start){ showToast('End date must be on or after the start date.'); return; }
+    } else {
+      start = todayISO();
+      end = null;
+    }
+    if(!state.desksConfig[deskId]){ state.desksConfig[deskId] = { periods: [] }; }
+    if(!state.desksConfig[deskId].periods){ state.desksConfig[deskId].periods = []; }
+    state.desksConfig[deskId].periods.push({ id: generateId(), start: start, end: end, note: note });
+    await saveDesksConfig();
+    renderFloorplan();
+    renderAdminExistingPeriods(deskId);
+    renderAdminList();
+    document.getElementById('adminNoteInput').value = '';
+    showToast('Hot Desk ' + deskId + ' marked unavailable.');
+  }
+
+  function renderAdminList(){
+    var list = document.getElementById('adminList');
+    var rows = [];
+    ALL_DESK_IDS.forEach(function(id){
+      var cfg = state.desksConfig[id];
+      if(cfg && cfg.periods && cfg.periods.length){
+        cfg.periods.forEach(function(p){
+          rows.push('<div class="admin-row"><span class="name">Hot Desk '+id+'</span><span style="color:var(--red);text-align:right;font-size:12px;">'+escapeHtml(describePeriod(p))+'</span></div>');
+        });
+      }
+    });
+    var today = todayISO();
+    var todaysBookings = Object.keys(state.bookings)
+      .map(function(k){ return state.bookings[k]; })
+      .filter(function(b){ return b.date === today; })
+      .sort(function(a,b){ return a.deskId - b.deskId; });
+    if(todaysBookings.length){
+      rows.push('<div class="admin-row" style="border-bottom:none;padding-top:16px;"><span class="name" style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em;">Booked today</span></div>');
+      todaysBookings.forEach(function(b){
+        rows.push('<div class="admin-row"><span class="name">Hot Desk '+b.deskId+'</span><span style="text-align:right;">'+escapeHtml(b.name)+'</span></div>');
+      });
+    } else {
+      rows.push('<div class="admin-row"><span class="name">Booked today</span><span>0 of '+ALL_DESK_IDS.length+'</span></div>');
+    }
+    list.innerHTML = rows.join('') || '<div class="empty-state">All desks available.</div>';
+  }
+
+  function toggleAdmin(){
+    if(state.isAdmin){
+      state.isAdmin = false;
+      document.getElementById('adminToggleBtn').classList.remove('admin-on');
+      document.getElementById('adminToggleBtn').textContent = 'Admin';
+      closeOverlay('adminEditOverlay');
+      document.getElementById('adminPanel').classList.remove('show');
+      document.getElementById('adminBackdrop').classList.remove('show');
+      renderFloorplan();
+      return;
+    }
+    var code = prompt('Enter admin passcode');
+    if(code === null) return;
+    if(code !== ADMIN_PASSCODE){
+      showToast('Incorrect passcode.');
+      return;
+    }
+    state.isAdmin = true;
+    document.getElementById('adminToggleBtn').classList.add('admin-on');
+    document.getElementById('adminToggleBtn').textContent = 'Admin mode on';
+    renderFloorplan();
+    renderAdminList();
+    document.getElementById('adminPanel').classList.add('show');
+    document.getElementById('adminBackdrop').classList.add('show');
+  }
+
+  function wireStaticEvents(){
+    document.getElementById('adminToggleBtn').addEventListener('click', toggleAdmin);
+    document.getElementById('clearDatesBtn').addEventListener('click', function(){
+      state.selectedDates = [];
+      renderDateStrip();
+      renderFloorplan();
+    });
+    document.getElementById('modeSingleBtn').addEventListener('click', function(){ setDateMode('single'); });
+    document.getElementById('modeMultipleBtn').addEventListener('click', function(){ setDateMode('multiple'); });
+    document.getElementById('openCalendarBtn').addEventListener('click', openCalendarPopover);
+    document.getElementById('calCloseBtn').addEventListener('click', function(){ closeOverlay('calendarOverlay'); });
+    document.getElementById('calPrevBtn').addEventListener('click', function(){ shiftCalendarMonth(-1); });
+    document.getElementById('calNextBtn').addEventListener('click', function(){ shiftCalendarMonth(1); });
+    document.getElementById('nameSaveBtn').addEventListener('click', async function(){
+      var val = document.getElementById('nameInput').value.trim();
+      if(!val){ showToast('Enter your name to continue.'); return; }
+      var isFirstLogin = !state.profile;
+      state.profile = { name: val };
+      await saveProfile();
+      renderProfileChip();
+      renderMyBookings();
+      closeOverlay('nameOverlay');
+      if(isFirstLogin){ revealApp(); }
+    });
+    document.getElementById('nameInput').addEventListener('keydown', function(e){
+      if(e.key === 'Enter'){ document.getElementById('nameSaveBtn').click(); }
+    });
+    document.getElementById('confirmCloseBtn').addEventListener('click', function(){ closeOverlay('confirmOverlay'); });
+    document.getElementById('errorCloseBtn').addEventListener('click', function(){ closeOverlay('errorOverlay'); });
+    document.getElementById('adminEditCancelBtn').addEventListener('click', function(){ closeOverlay('adminEditOverlay'); });
+    document.getElementById('adminPeriodType').addEventListener('change', updatePeriodTypeUI);
+    document.getElementById('adminAddPeriodBtn').addEventListener('click', addPeriod);
+    document.getElementById('adminCloseBtn').addEventListener('click', function(){
+      document.getElementById('adminPanel').classList.remove('show');
+      document.getElementById('adminBackdrop').classList.remove('show');
+    });
+    document.getElementById('adminBackdrop').addEventListener('click', function(){
+      document.getElementById('adminPanel').classList.remove('show');
+      document.getElementById('adminBackdrop').classList.remove('show');
+    });
+    document.getElementById('profileChip').addEventListener('click', function(){
+      openOverlay('nameOverlay');
+      if(state.profile){ document.getElementById('nameInput').value = state.profile.name; }
+    });
+  }
+
+  function fadeBgLayers(on){
+    document.querySelectorAll('.bg-layer').forEach(function(el){
+      el.classList.toggle('faded', on);
+    });
+  }
+
+  function revealApp(){
+    var root = document.getElementById('appRoot');
+    requestAnimationFrame(function(){
+      root.classList.remove('pre-reveal');
+      fadeBgLayers(true);
+    });
+  }
+
+  async function init(){
+    await loadAll();
+    applyTheme();
+    renderProfileChip();
+    renderModeToggle();
+    renderDateStrip();
+    renderFloorplan();
+    renderMyBookings();
+    wireStaticEvents();
+    var root = document.getElementById('appRoot');
+    if(!state.profile){
+      root.classList.add('pre-reveal');
+      openOverlay('nameOverlay');
+    } else {
+      fadeBgLayers(true);
+    }
+  }
+
+  init();
+
+})();
+</script>
+</body>
+</html>
